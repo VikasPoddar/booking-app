@@ -3,45 +3,56 @@ package main
 import (
 	"booking-app/helper"
 	"fmt"
-	"strings"
+	"sync"
+	"time"
 )
 
 var conferenceName = "Go Conference"
 var remainingTickets uint = 50
-var bookings []string
+var bookings []User
 
 const conferenceTickets = 50
+
+var wg = sync.WaitGroup{}
+
+type User struct {
+	firstName       string
+	lastName        string
+	email           string
+	numberOfTickets uint
+}
 
 func main() {
 
 	greetUsers(conferenceName, conferenceTickets, remainingTickets)
-	for {
-		firstName, lastName, email, userTickets := getUserInput()
-		isValidName, isValidEmail, isValidTicketNumber := helper.ValidateUserInput(firstName, lastName, email, userTickets, remainingTickets)
 
-		if isValidName && isValidEmail && isValidTicketNumber {
-			bookTickets(&remainingTickets, userTickets, &bookings, firstName, lastName, email, conferenceName)
-			firstNames := getFirstName(bookings)
-			fmt.Printf("Tickets booked by %v\n", firstNames)
-			if remainingTickets == 0 {
-				fmt.Printf("Our conference is booked out. Come next year.")
-				break
-			}
-		} else {
+	firstName, lastName, email, userTickets := getUserInput()
+	isValidName, isValidEmail, isValidTicketNumber := helper.ValidateUserInput(firstName, lastName, email, userTickets, remainingTickets)
 
-			if !isValidName {
-				fmt.Println("Enter your name correctly")
-			}
-			if !isValidEmail {
-				fmt.Println("Enter a valid email address")
-			}
-			if !isValidTicketNumber {
-				fmt.Println("Enter a valid number of tickets")
-			}
-			fmt.Printf("Your input data is invalid. Try again.\n")
+	if isValidName && isValidEmail && isValidTicketNumber {
+		bookTickets(&remainingTickets, userTickets, &bookings, firstName, lastName, email, conferenceName)
+		wg.Add(1)
+		go sendTicket(userTickets, firstName, lastName, email)
+		firstNames := getFirstName(bookings)
+		fmt.Printf("The first name of bookings %v\n", firstNames)
+		if remainingTickets == 0 {
+			fmt.Printf("Our conference is booked out. Come next year.")
+
 		}
+	} else {
 
+		if !isValidName {
+			fmt.Println("Enter your name correctly")
+		}
+		if !isValidEmail {
+			fmt.Println("Enter a valid email address")
+		}
+		if !isValidTicketNumber {
+			fmt.Println("Enter a valid number of tickets")
+		}
+		fmt.Printf("Your input data is invalid. Try again.\n")
 	}
+	wg.Wait()
 }
 
 func greetUsers(conferenceName string, conferenceTickets int, remainingTickets uint) {
@@ -50,11 +61,10 @@ func greetUsers(conferenceName string, conferenceTickets int, remainingTickets u
 	fmt.Println("Get your tickets here to attend")
 }
 
-func getFirstName(bookings []string) []string {
+func getFirstName(bookings []User) []string {
 	var firstNames []string
 	for _, booking := range bookings {
-		var names = strings.Fields(booking)
-		firstNames = append(firstNames, names[0])
+		firstNames = append(firstNames, booking.firstName)
 	}
 	return firstNames
 }
@@ -75,9 +85,19 @@ func getUserInput() (string, string, string, uint) {
 	return firstName, lastName, email, userTickets
 }
 
-func bookTickets(remainingTickets *uint, userTickets uint, bookings *[]string, firstName, lastName, email, conferenceName string) {
+func bookTickets(remainingTickets *uint, userTickets uint, bookings *[]User, firstName, lastName, email, conferenceName string) {
 	*remainingTickets = *remainingTickets - userTickets
-	*bookings = append(*bookings, firstName+" "+lastName)
+	var userData = User{firstName, lastName, email, userTickets}
+	*bookings = append(*bookings, userData)
 	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
-	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
+	fmt.Printf("%v tickets remaining for %v\n", *remainingTickets, conferenceName)
+}
+
+func sendTicket(userTickets uint, firstName, lastName, email string) {
+	time.Sleep(10 * time.Second)
+	ticket := fmt.Sprintf("%v Ticket for %v %v", userTickets, firstName, lastName)
+	fmt.Println("###########")
+	fmt.Printf("Sending %v \n to email address %v\n", ticket, email)
+	fmt.Println("###########")
+	wg.Done()
 }
